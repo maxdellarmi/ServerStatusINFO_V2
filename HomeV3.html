@@ -17,7 +17,7 @@
         };
 
         //funzione da chiamare dopo il caricamento iniziale della configurazione avvenuto con successo
-        var successLoadConfig = function (resp) {
+        var LoadJolokiaDefinition = function (resp) {
             console.log('inizio elaborazione configurazione....');
             var getServerData = JSON.parse($('#myServersData').attr('data-servers'));
             $.each(getServerData, function (index, object) {
@@ -30,7 +30,7 @@
                 /*"object": "wwGateway",
                 "object.uriCall": "/jolokia/read/wwGatewayRecordSession:type=WWGatewayRecordSessionImpl",*/
                 var objectName = object.split(':')[0].replace('Record', '').replace('Session', '').replace('record', '').replace('session', '');
-                LoadAllServerData(serverSelected, uriCall, objectName);
+                callMbeansInfo(serverSelected, uriCall, objectName);
             });
         };
         
@@ -78,6 +78,7 @@
                         var jsonValue = JSON.stringify(theArray.sort(function (a, b) {
                             return a.toLowerCase().localeCompare(b.toLowerCase());
                         }));
+                        console.info(jsonValue);
                         $('#myServersData').attr('data-servers', jsonValue)
                         console.log("configurazione iniziale restituita dal server.....")
                         console.info(jsonValue);
@@ -102,12 +103,12 @@
         function getAllJolokiaMBean() {
             var initialConfiguration = configureJolokiaBean();
             //chiamata all'elaborazione dei valori restituiti
-            //all'interno di successLoadConfig viene chiamato LoadAllServerData
-            initialConfiguration.then(successLoadConfig, errorLoadConfig);
+            //all'interno di LoadJolokiaDefinition viene chiamato callMbeansInfo
+            initialConfiguration.then(LoadJolokiaDefinition, errorLoadConfig);
         }
 
 
-        function LoadAllServerData(serverSelected, urlMbean, description) {
+        function callMbeansInfo(serverSelected, urlMbean, description) {
             /*PER FARLO FUNZIONARE DA CHIAMATA SU FILE DIRETTO */
             /* crossDomain: true,
                dataType: 'jsonp',*/
