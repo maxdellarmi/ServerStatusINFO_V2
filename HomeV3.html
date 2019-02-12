@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link href="Content/bootstrap.css" rel="stylesheet" />
+    <link href="Content/Site.css" rel="stylesheet" />
+    <script src="Scripts/jquery-1.9.1.js"></script>
+    <script src="Scripts/bootstrap.js"></script>
+    <script>
+
+        var errorLoadConfig = function (req, status, err) {
+            console.error("ERRORE DURANTE IL TENTATIVO DI ACCESSO AL PROGETTO:" + description);
+            console.error(description + ":" + err);
+        };
+
+        var successLoadConfig = function (resp) {
+            console.log('inizio elaborazione configurazione....');
+            //non è più json a questo punto ma un semplice array se vuoi convertirlo in json
+            var getServerData = JSON.parse($('#myServersData').attr('data-servers'));
+
+
+
+            $.each(getServerData, function (index, object) {
+                var serverSelected = $('#AmbienteSelezionatoIP').attr('data-value');
+                var uriCall = "/jolokia/read/" + object;
+                console.log(object);
+                console.log(uriCall);
+                console.log(serverSelected);
+
+                /*"object": "wwGateway",
+                "object.uriCall": "/jolokia/read/wwGatewayRecordSession:type=WWGatewayRecordSessionImpl",*/
+                var objectName = object.split(':')[0].replace('Record', '').replace('Session', '').replace('record', '').replace('session', '');
+                LoadAllServerData(serverSelected, uriCall, objectName);
+            });
+        };
+        
+        function populate(selector) {
+            $(selector)
+                .append('<option value="http://10.14.32.210:7011">DEV1</option>')
+                .append('<option value="http://10.14.32.211:7011">DEV2</option>')
+                .append('<option value="http://10.14.48.116:7011">SIT1</option>')
+                .append('<option value="http://10.14.48.116:7021">SIT2</option>')
+                .append('<option value="http://10.14.66.70:7011">CAT1</option>')
+                .append('<option value="http://10.14.66.71:7021">CAT2</option>')
+                .append('<option value="IMPOSTARE INDIRIZZO IP PROD1">PROD1</option>')
+                .append('<option value="IMPOSTARE INDIRIZZO IP PROD2">PROD2</option>')
+
+
+        }
+
+
+        /*
+        ESEMPIO DATA HTML5 
+        <div id="outer">  <div id="mydiv" data-myval="10"></div> </div>alert($('#outer').html());  
+        alerts <div id="mydiv" data-myval="10"> </div>
+        var a = $('#mydiv').data('myval'); //getter
+        $('#mydiv').attr("data-myval","20"); //setter
+        alert($('#outer').html());   //alerts <div id="mydiv" data-myval="20"> </div>*/
+
+
+        function configureJolokiaBean() {
+            var dfd = $.Deferred();
+            //CHIAMATA A JOLOKIA PER ELENCO MBEAN AMBIENTE!
+            //esempio http://10.14.32.210:7011/jolokia/search/*:type=*SessionImpl*
+            var serverSelected = $('#AmbienteSelezionatoIP').attr('data-value');
+            var uriToCall = serverSelected + '/jolokia/search/*:type=*SessionImpl*'
+            console.log("sto per chiamare uri:" + uriToCall);
+            $.ajax({
+                dataType: "jsonp",
+                type: "GET",
+                url: uriToCall,
+                cache: false,
+                crossDomain: true,
+                success: function (data) {
+                    try {
+
+                        var theArray = data.value;
+                        //recupera dal server la lista degli mbean! e ordina in ordine alfabetico case insensitive
+                        var jsonValue = JSON.stringify(theArray.sort(function (a, b) {
+                            return a.toLowerCase().localeCompare(b.toLowerCase());
+                        }));
+                        $('#myServersData').attr('data-servers', jsonValue)
+                        console.log("configurazione iniziale restituita dal server.....")
+                        console.info(jsonValue);
+                        dfd.resolve();
+                    }
+                    catch (err) {
+                        console.error("ERRORE DURANTE IL TENTATIVO DI ACCESSO AL PROGETTO:");
+                        console.info(data);
+                        console.error(":" + err);
+                    }
+                },
+                error: function (req, err) {
+                    console.error("ERRORE DURANTE IL TENTATIVO DI ACCESSO AL PROGETTO:");
+                    console.error(":" + err);
+                }
+            });
+
+          return dfd.promise();
+        }
+
+        //inizio autoconfigurazione
+        function getAllJolokiaMBean() {
+            var initialConfiguration = configureJolokiaBean();
+            //chiamata all'elaborazione dei valori restituiti
+            //all'interno di successLoadConfig viene chiamato LoadAllServerData
+            initialConfiguration.then(successLoadConfig, errorLoadConfig);
+        }
+
+
+        function LoadAllServerData(serverSelected, urlMbean, description) {
+            /*PER FARLO FUNZIONARE DA CHIAMATA SU FILE DIRETTO */
+            /* crossDomain: true,
+               dataType: 'jsonp',*/
+
+            var urlToCall = serverSelected + urlMbean;
+            console.log(urlToCall);
+            $.ajax({
+                dataType: "jsonp",
+                type: "GET",
+                url: urlToCall,
+                cache: false,
+                crossDomain: true,
+                success: function (data) {
+                    try {
+                        var $tr = $('<tr>').append(
+                            $('<td>').text(description),  //.text(data.request.mbean),
+                            $('<td>').text(data.value.SuccessCounter),
+                            $('<td>').text(data.value.FailureCounter)
+                        );
+                        console.log($tr.wrap('<p>').html())
+                        $("#tblData").append($tr).html();
+                    }
+                    catch (err) {
+                        console.error("ERRORE DURANTE IL TENTATIVO DI ACCESSO AL PROGETTO:" + description);
+                        console.info(data);
+                        console.error(description + ":" + err);
+                    }
+                },
+                error: function (req, err) {
+                    console.error("ERRORE DURANTE IL TENTATIVO DI ACCESSO AL PROGETTO:" + description);
+                    console.error(description + ":" + err);
+                }
+            });
+        }
+
+        function startServerQuery(server) {
+            console.log("chiama server");
+            //svuota tutto prima di chiamare
+            $("#tblData tbody").html("");
+
+            //avvio chiamate ai server per recupero dati mbean
+            getAllJolokiaMBean();
+        }
+
+        function updateValues() {
+            console.log("updateValues")
+            var ambienteSelezionato = $('#AmbienteSelezionatoIP').attr('data-value');
+            if (ambienteSelezionato !== null && ambienteSelezionato !== undefined && ambienteSelezionato!== "" ) {
+                $("#cmbAmbienti").val(ambienteSelezionato);
+            }
+            else {
+                console.log("prima assegnazione");
+                $('#AmbienteSelezionatoIP').attr('data-value', 'http://10.14.32.210:7011');
+            }
+        }
+
+        $(document).ready(function () {
+            console.log("ready!");
+            console.log("Caricamento dropdown...")
+            //popolazione dinamica della combobox
+            populate('#formAmbienti #cmbAmbienti');
+            //gestione sul click del bottone chiamata al server
+            $("#btnStartServerQuery").click(
+                function () {
+                    console.log("Caricamento inizio chiamata al server...")
+                    //PASSA LELEMENTO SELEZIONATO
+                    startServerQuery();
+                }
+            );
+
+            $("#btnClear").click(
+                function () {
+                    console.log("clear tabella...")
+                    //svuota tutto prima di chiamare
+                    $("#tblData tbody").html("");
+                }
+            );
+
+            
+
+            //gestione onchange dropdown
+            $(document).on('change', '#cmbAmbienti', function (e) {
+                console.log(this.options[e.target.selectedIndex].text);
+                $('#AmbienteSelezionatoDescription').attr('data-value' , this.options[e.target.selectedIndex].text);
+                $('#AmbienteSelezionatoIP').attr('data-value', this.options[e.target.selectedIndex].value);
+            }); 
+            //reimposta il valore attualmente salvato
+            updateValues();
+        });
+    </script>
+</head>
+<body>
+    <!--TUTTI I DATI DI JOOLOKIA SERVERS
+        40 elementi (partendo da 0 = 39)-->
+    <div id="myServersData" data-servers='' class="hidden"></div>
+    <!--TUTTI I DATI REALATIVI ALLO STATUS DELLA COMBO-->
+    <div id="AmbienteSelezionatoDescription" data-value="" class="hidden"></div>
+    <div id="AmbienteSelezionatoIP" data-value="" class="hidden"></div>
+
+
+    <!--Header <span class="glyphicon glyphicon-file" </span>> End-->
+    <nav class="navbar navbar-inverse container-fluid navbar-fixed-top">
+        <div class="row">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="#">Selezionare l'ambiente<span class="glyphicon glyphicon-file"></span></a>
+                <!--<form class="navbar-form navbar-left" role="search" >-->
+                <div class="navbar-form navbar-left form-group-sm" id="formAmbienti">
+                    <div class="input-group">
+                        <select id="cmbAmbienti" placeholder="Search" class="col-xs-offset-1 col-xs-8" style="width:auto; margin-top:5px"></select>
+                        <input type="hidden" />
+                        <span class="input-group-btn">
+                            <button id="btnStartServerQuery" class="btn btn-success btn-sm" style="margin-left:15px">Caricamento dati</button>
+                            <button id="btnClear" class="btn btn-success btn-sm" style="margin-left:15px">Pulizia dati</button>
+                        </span>
+                    </div>
+                </div>
+                <!--</form>-->
+            </div>
+        </div><!-- /.container-fluid -->
+    </nav>
+    <!--Section Start-->
+    <section class="container">
+        <div class="row" id="whiteSpace">
+        </div>
+    </section>
+    <section class="container">
+        <div class="row">
+            <div class="main-content col-sm-12">
+
+                <article>
+                    <div class="panel panel-primary">
+                        <div class="panel-heading">
+                            <h2 class="panel-title">Status Servizi</h2>
+                        </div>
+                        <!--
+                        <div class="panel-body">
+                        </div>-->
+                        <table class="table table-responsive table-striped table-condensed table-hover" id="tblData">
+                            <tbody>
+                            <thead>
+                                <tr class="success">
+                                    <td class="col-xs-8">Nome del Servizio</td>
+                                    <td class="col-xs-2">OK Tot</td>
+                                    <td class="col-xs-2">KO Tot</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!--
+                                <tr>
+                                    <td>B2BService1 </td>
+                                    <td>0</td>
+                                    <td>1</td>
+                                </tr>
+                                <tr>
+                                    <td>B2BService2 </td>
+                                    <td>0</td>
+                                    <td>2</td>
+                                </tr>
+                                <tr>
+                                    <td>B2BService3 </td>
+                                    <td>1</td>
+                                    <td>0</td>
+                                </tr>
+                                <tr>
+                                    <td>B2BService4 </td>
+                                    <td>2</td>
+                                    <td>0</td>
+                                </tr>-->
+                            </tbody>
+                        </table>
+                        <!--<div class="panel-footer">
+                            <div class="row">
+                                <div class="col-xs-9">
+                                    <p>Put tags and view count</p>
+                                </div>
+                                <div class="col-xs-3">
+                                    <a href="#">Read More..</a>
+                                </div>
+                            </div>
+                        </div>-->
+                    </div>
+                </article>
+
+                <!--<nav>
+                    <ul class="pager">
+                        <li class="previous disabled"><a href="#"><span aria-hidden="true">&larr;</span> Previous</a></li>
+                        <li class="next"><a href="#">Next <span aria-hidden="true">&rarr;</span></a></li>
+                    </ul>
+                </nav>-->
+            </div>
+        </div>
+    </section>
+    <!--Section End-->
+    <!--Footer Start mancanza spazio ultimi elementi tabella
+    <footer class="container-fluid navbar-fixed-bottom">
+        <p>© Lottomatica <a href="#"></a>, All rights reserved.</p>
+    </footer>-->
+</body>
+    </html>
