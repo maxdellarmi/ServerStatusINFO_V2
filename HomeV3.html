@@ -10,18 +10,16 @@
     <script src="Scripts/bootstrap.js"></script>
     <script>
 
+        //routine di gestione errore.
         var errorLoadConfig = function (req, status, err) {
-            console.error("ERRORE DURANTE IL TENTATIVO DI ACCESSO AL PROGETTO:" + description);
-            console.error(description + ":" + err);
+            console.error("ERRORE:" + req);
+            console.error(status + ":" + err);
         };
 
+        //funzione da chiamare dopo il caricamento iniziale della configurazione avvenuto con successo
         var successLoadConfig = function (resp) {
             console.log('inizio elaborazione configurazione....');
-            //non è più json a questo punto ma un semplice array se vuoi convertirlo in json
             var getServerData = JSON.parse($('#myServersData').attr('data-servers'));
-
-
-
             $.each(getServerData, function (index, object) {
                 var serverSelected = $('#AmbienteSelezionatoIP').attr('data-value');
                 var uriCall = "/jolokia/read/" + object;
@@ -75,7 +73,6 @@
                 crossDomain: true,
                 success: function (data) {
                     try {
-
                         var theArray = data.value;
                         //recupera dal server la lista degli mbean! e ordina in ordine alfabetico case insensitive
                         var jsonValue = JSON.stringify(theArray.sort(function (a, b) {
@@ -203,8 +200,7 @@
     </script>
 </head>
 <body>
-    <!--TUTTI I DATI DI JOOLOKIA SERVERS
-        40 elementi (partendo da 0 = 39)-->
+    <!--TUTTI I DATI DI JOOLOKIA nel tag data-server vengono caricati inizialmente-->
     <div id="myServersData" data-servers='' class="hidden"></div>
     <!--TUTTI I DATI REALATIVI ALLO STATUS DELLA COMBO-->
     <div id="AmbienteSelezionatoDescription" data-value="" class="hidden"></div>
